@@ -102,6 +102,8 @@ const WEB_APP_URL = "https://script.google.com/a/macros/cactoquepala.com.pe/s/AK
 
 let scanner = null;
 let procesando = false;
+let ultimoCodigo = "";
+let ultimaLecturaMs = 0;
 
 function actualizarEstadoConexion() {
   const pendientes = obtenerPendientes().length;
@@ -158,12 +160,22 @@ function detenerEscaner() {
 }
 
 function codigoDetectado(decodedText) {
+  const codigoActual = String(decodedText).trim();
+  const ahora = Date.now();
+
   if (procesando) return;
+
+  if (codigoActual === ultimoCodigo && (ahora - ultimaLecturaMs) < 4000) {
+    return;
+  }
+
+  ultimoCodigo = codigoActual;
+  ultimaLecturaMs = ahora;
   procesando = true;
   feedbackDetectado();
 
   const lectura = {
-    codigo: String(decodedText).trim(),
+codigo: codigoActual,
     modo: document.getElementById("modo").value,
     usuario: document.getElementById("usuario").value || "",
     origen: navigator.onLine ? "ONLINE" : "OFFLINE_SINCRONIZADO",
@@ -210,16 +222,24 @@ function enviarLectura(lectura, mostrar) {
 }
 
 function mostrarRespuesta(res) {
- if (res.encontrado || res.ok) {
-  feedbackExito();
-} else {
-  feedbackError();
+ let texto = "";
+  
+  if (res.duplicado) {
+  texto =
+    "🟡 DUPLICADO\n\n" +
+    "Código: " + res.codigo + "\n" +
+    "Nombre corto: " + res.nombreCorto + "\n" +
+    "Nombre largo: " + res.nombreLargo + "\n\n" +
+    "Marca actual:\n" + res.checkActual + "\n\n" +
+    res.mensaje;
+
+  document.getElementById("resultado").innerText = texto;
+  liberarLectura();
+  actualizarEstadoConexion();
+  return;
 }
   
-  
-  let texto = "";
-
-  if (res.encontrado) {
+   if (res.encontrado) {
     texto =
       "✅ ENCONTRADO\n\n" +
       "Código: " + res.codigo + "\n" +
