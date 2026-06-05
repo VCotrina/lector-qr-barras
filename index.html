@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lector QR / Código de Barras</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      padding: 14px;
+      margin: 0;
+    }
+
+    .card {
+      max-width: 520px;
+      margin: auto;
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+    }
+
+    h2 {
+      text-align: center;
+      margin-top: 0;
+    }
+
+    select, input, button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 10px;
+      font-size: 16px;
+      border-radius: 9px;
+      border: 1px solid #d1d5db;
+      box-sizing: border-box;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .danger { background: #dc2626; }
+    .sync { background: #059669; }
+
+    #reader {
+      margin-top: 15px;
+      width: 100%;
+    }
+
+    #estado {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: bold;
+      background: #e5e7eb;
+    }
+
+    #resultado {
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 10px;
+      background: #eef2ff;
+      white-space: pre-line;
+      font-size: 15px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h2>Lector QR / Código de Barras</h2>
+
+    <div id="estado">Verificando conexión...</div>
+
+    <label>Usuario / Responsable:</label>
+    <input id="usuario" placeholder="Ejemplo: Víctor Cotrina">
+
+    <label>Modo:</label>
+    <select id="modo">
+      <option value="libre">Registro libre</option>
+      <option value="verificacion">Verificar contra BASE</option>
+    </select>
+
+    <button onclick="iniciarEscaner()">Iniciar escáner</button>
+    <button class="danger" onclick="detenerEscaner()">Detener escáner</button>
+    <button class="sync" onclick="sincronizarPendientes()">Sincronizar pendientes</button>
+
+    <div id="reader"></div>
+    <div id="resultado">Esperando lectura...</div>
+  </div>
+
+<script>
+const WEB_APP_URL = "https://script.google.com/a/macros/cactoquepala.com.pe/s/AKfycbyhUuN4aPfA3t2HRAfSBFdYOX7vEIiQYpBkP0BujtnXlOWyHk-sHuPY43p4mVu3Wfte/exec";
+
+let scanner = null;
+let procesando = false;
+
+function actualizarEstadoConexion() {
+  const pendientes = obtenerPendientes().length;
+  document.getElementById("estado").innerText =
+    navigator.onLine
+      ? "🟢 Online | Pendientes: " + pendientes
+      : "🔴 Offline | Pendientes: " + pendientes;
+}
+
+window.addEventListener("online", () => {
+  actualizarEstadoConexion();
+  sincronizarPendientes();
+});
+
+window.addEventListener("offline", actualizarEstadoConexion);
+setInterval(actualizarEstadoConexion, 3000);
+
+function iniciarEscaner() {
+  procesando = false;
+
+  scanner = new Html5Qrcode("reader");
+
+  const config = {
+    fps: 10,
+    qrbox: { width: 260, height: 260 },
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.QR_CODE,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E
+    ]
+  };
+
+  scanner.start(
+    { facingMode: "environment" },
+    config,
+    codigoDetectado,
+    error => {}
+  ).catch(err => {
+    document.getElementById("resultado").innerText =
+      "No se pudo iniciar la cámara:\n" + err;
+  });
+}
+
+function detenerEscaner() {
+  if (!scanner) return;
+
+  scanner.stop().then(() => {
+    document.getElementById("resultado").innerText = "Escáner detenido.";
+  });
+}
+
+function codigoDetectado(decodedText) {
+  if (procesando) return;
+  procesando = true;
+
+  const lectura = {
+    codigo: String(decodedText).trim(),
+    modo: document.getElementById("modo").value,
+    usuario: document.getElementById("usuario").value || "",
+    origen: navigator.onLine ? "ONLINE" : "OFFLINE_SINCRONIZADO",
+    fechaLocal: new Date().toISOString()
+  };
+
+  document.getElementById("resultado").innerText =
+    "Código leído:\n" + lectura.codigo + "\n\nProcesando...";
+
+  if (!navigator.onLine) {
+    guardarPendiente(lectura);
+    document.getElementById("resultado").innerText =
+      "📴 SIN INTERNET\n\nCódigo guardado localmente:\n" +
+      lectura.codigo +
+      "\n\nSe sincronizará cuando vuelva la señal.";
+
+    liberarLectura();
+    actualizarEstadoConexion();
+    return;
+  }
+
+  enviarLectura(lectura, true);
+}
+
+function enviarLectura(lectura, mostrar) {
+  const accion = lectura.modo === "libre" ? "registrar" : "verificar";
+
+  const params = {
+    accion: accion,
+    codigo: lectura.codigo,
+    usuario: lectura.usuario || "",
+    origen: lectura.origen || "ONLINE"
+  };
+
+  jsonp(WEB_APP_URL, params, function(res) {
+    if (mostrar) mostrarRespuesta(res);
+  }, function() {
+    guardarPendiente(lectura);
+    document.getElementById("resultado").innerText =
+      "⚠️ No se pudo enviar a la nube.\n\nLa lectura quedó pendiente.";
+    liberarLectura();
+    actualizarEstadoConexion();
+  });
+}
+
+function mostrarRespuesta(res) {
+  let texto = "";
+
+  if (res.encontrado) {
+    texto =
+      "✅ ENCONTRADO\n\n" +
+      "Código: " + res.codigo + "\n" +
+      "Nombre corto: " + res.nombreCorto + "\n" +
+      "Nombre largo: " + res.nombreLargo + "\n\n" +
+      res.mensaje;
+  } else if (res.ok) {
+    texto =
+      "✅ REGISTRADO\n\n" +
+      "Código: " + res.codigo + "\n\n" +
+      res.mensaje;
+  } else {
+    texto =
+      "⚠️ NO ENCONTRADO\n\n" +
+      "Código: " + res.codigo + "\n\n" +
+      res.mensaje;
+  }
+
+  document.getElementById("resultado").innerText = texto;
+  liberarLectura();
+  actualizarEstadoConexion();
+}
+
+function liberarLectura() {
+  setTimeout(() => {
+    procesando = false;
+  }, 1500);
+}
+
+function obtenerPendientes() {
+  const data = localStorage.getItem("lecturasPendientes");
+  return data ? JSON.parse(data) : [];
+}
+
+function guardarPendiente(lectura) {
+  const pendientes = obtenerPendientes();
+  lectura.idLocal = Date.now() + "_" + Math.random();
+  lectura.origen = "OFFLINE_SINCRONIZADO";
+  pendientes.push(lectura);
+  localStorage.setItem("lecturasPendientes", JSON.stringify(pendientes));
+}
+
+function sincronizarPendientes() {
+  if (!navigator.onLine) {
+    document.getElementById("resultado").innerText =
+      "Sin conexión. No se puede sincronizar.";
+    return;
+  }
+
+  const pendientes = obtenerPendientes();
+
+  if (pendientes.length === 0) {
+    actualizarEstadoConexion();
+    return;
+  }
+
+  document.getElementById("resultado").innerText =
+    "Sincronizando pendientes: " + pendientes.length;
+
+  sincronizarUnoPorUno(pendientes, 0);
+}
+
+function sincronizarUnoPorUno(lista, index) {
+  if (index >= lista.length) {
+    localStorage.removeItem("lecturasPendientes");
+    document.getElementById("resultado").innerText =
+      "✅ Sincronización completada.";
+    actualizarEstadoConexion();
+    return;
+  }
+
+  enviarLectura(lista[index], false);
+
+  setTimeout(() => {
+    sincronizarUnoPorUno(lista, index + 1);
+  }, 900);
+}
+
+function jsonp(url, params, success, failure) {
+  const callbackName = "cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+
+  params.callback = callbackName;
+
+  const query = Object.keys(params)
+    .map(k => encodeURIComponent(k) + "=" + encodeURIComponent(params[k]))
+    .join("&");
+
+  const script = document.createElement("script");
+
+  window[callbackName] = function(data) {
+    success(data);
+    cleanup();
+  };
+
+  script.onerror = function() {
+    failure();
+    cleanup();
+  };
+
+  function cleanup() {
+    delete window[callbackName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+  }
+
+  script.src = url + "?" + query;
+  document.body.appendChild(script);
+}
+
+actualizarEstadoConexion();
+</script>
+</body>
+</html>
