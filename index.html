@@ -96,7 +96,7 @@
     <button onclick="iniciarEscaner()">Iniciar escáner</button>
     <button class="danger" onclick="detenerEscaner()">Detener escáner</button>
     <button class="sync" onclick="sincronizarPendientes()">Sincronizar pendientes</button>
-
+    <button class="danger" onclick="reiniciarBase()">Reiniciar BASE</button>
     <div id="reader"></div>
     <div id="resultado">Esperando lectura...</div>
   </div>
@@ -428,6 +428,22 @@ function cargarResumen() {
       " | Duplicados: " + res.duplicados;
   }, function() {
     console.log("No se pudo cargar resumen");
+  });
+}
+
+function reiniciarBase() {
+  const confirmar = confirm(
+    "¿Seguro que deseas limpiar CHECK y DUPLICADOS de la BASE?"
+  );
+
+  if (!confirmar) return;
+
+  jsonp(WEB_APP_URL, { accion: "reiniciar" }, function(res) {
+    document.getElementById("resultado").innerText = res.mensaje;
+    cargarResumen();
+  }, function() {
+    document.getElementById("resultado").innerText =
+      "No se pudo reiniciar la BASE.";
   });
 }
   
