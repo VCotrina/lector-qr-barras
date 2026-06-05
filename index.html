@@ -160,6 +160,7 @@ function detenerEscaner() {
 function codigoDetectado(decodedText) {
   if (procesando) return;
   procesando = true;
+  feedbackDetectado();
 
   const lectura = {
     codigo: String(decodedText).trim(),
@@ -209,6 +210,13 @@ function enviarLectura(lectura, mostrar) {
 }
 
 function mostrarRespuesta(res) {
+ if (res.encontrado || res.ok) {
+  feedbackExito();
+} else {
+  feedbackError();
+}
+  
+  
   let texto = "";
 
   if (res.encontrado) {
@@ -320,6 +328,67 @@ function jsonp(url, params, success, failure) {
   document.body.appendChild(script);
 }
 
+function feedbackDetectado() {
+  vibrar([80]);
+  beep(900, 120);
+  flashPantalla("#dbeafe");
+}
+
+function feedbackExito() {
+  vibrar([80, 60, 80]);
+  beep(1200, 120);
+  flashPantalla("#dcfce7");
+}
+
+function feedbackError() {
+  vibrar([250]);
+  beep(300, 250);
+  flashPantalla("#fee2e2");
+}
+
+function vibrar(patron) {
+  if (navigator.vibrate) {
+    navigator.vibrate(patron);
+  }
+}
+
+function beep(frecuencia, duracion) {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.frequency.value = frecuencia;
+    oscillator.type = "sine";
+
+    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+
+    oscillator.start();
+
+    setTimeout(() => {
+      oscillator.stop();
+      audioCtx.close();
+    }, duracion);
+  } catch (e) {
+    console.log("No se pudo reproducir beep", e);
+  }
+}
+
+function flashPantalla(color) {
+  const original = document.body.style.background;
+  document.body.style.background = color;
+
+  setTimeout(() => {
+    document.body.style.background = original || "#f3f4f6";
+  }, 250);
+}
+
+  
 actualizarEstadoConexion();
 </script>
 </body>
