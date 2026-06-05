@@ -80,6 +80,10 @@
 
     <div id="estado">Verificando conexión...</div>
 
+    <div id="resumen" style="margin-top:10px; padding:10px; border-radius:8px; background:#fef3c7; font-weight:bold; text-align:center;">
+  Total: - | Leídos: - | Pendientes: - | Duplicados: -
+</div>
+
     <label>Usuario / Responsable:</label>
     <input id="usuario" placeholder="Ejemplo: Víctor Cotrina">
 
@@ -260,6 +264,8 @@ function mostrarRespuesta(res) {
   }
 
   document.getElementById("resultado").innerText = texto;
+
+  cargarResumen();
   liberarLectura();
   actualizarEstadoConexion();
 }
@@ -409,8 +415,26 @@ function flashPantalla(color) {
   }, 250);
 }
 
+function cargarResumen() {
+  if (!navigator.onLine) return;
+
+  jsonp(WEB_APP_URL, { accion: "resumen" }, function(res) {
+    if (!res.ok) return;
+
+    document.getElementById("resumen").innerText =
+      "Total: " + res.total +
+      " | Leídos: " + res.leidos +
+      " | Pendientes: " + res.pendientes +
+      " | Duplicados: " + res.duplicados;
+  }, function() {
+    console.log("No se pudo cargar resumen");
+  });
+}
+  
   
 actualizarEstadoConexion();
+cargarResumen();
+  
 </script>
 </body>
 </html>
