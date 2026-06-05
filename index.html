@@ -97,6 +97,7 @@
     <button class="danger" onclick="detenerEscaner()">Detener escáner</button>
     <button class="sync" onclick="sincronizarPendientes()">Sincronizar pendientes</button>
     <button class="danger" onclick="reiniciarBase()">Reiniciar BASE</button>
+    <button onclick="verPendientes()">Ver pendientes</button>
     <div id="reader"></div>
     <div id="resultado">Esperando lectura...</div>
   </div>
@@ -446,6 +447,37 @@ function reiniciarBase() {
       "No se pudo reiniciar la BASE.";
   });
 }
+
+function verPendientes() {
+  jsonp(WEB_APP_URL, { accion: "pendientes" }, function(res) {
+    if (!res.ok) return;
+
+    if (res.cantidad === 0) {
+      document.getElementById("resultado").innerText =
+        "✅ No hay pendientes.";
+      return;
+    }
+
+    let texto = "📋 PENDIENTES: " + res.cantidad + "\n\n";
+
+    res.pendientes.slice(0, 30).forEach((item, index) => {
+      texto +=
+        (index + 1) + ". " +
+        item.codigo + " - " +
+        item.nombreCorto + "\n";
+    });
+
+    if (res.cantidad > 30) {
+      texto += "\nMostrando solo los primeros 30 pendientes.";
+    }
+
+    document.getElementById("resultado").innerText = texto;
+  }, function() {
+    document.getElementById("resultado").innerText =
+      "No se pudo cargar la lista de pendientes.";
+  });
+}
+
   
   
 actualizarEstadoConexion();
