@@ -230,7 +230,8 @@ function mostrarRespuesta(res) {
     "Código: " + res.codigo + "\n" +
     "Nombre corto: " + res.nombreCorto + "\n" +
     "Nombre largo: " + res.nombreLargo + "\n\n" +
-    "Marca actual:\n" + res.checkActual + "\n\n" +
+    "Primera marca:\n" + res.checkActual + "\n\n" +
+    "Cantidad de duplicados: " + res.duplicados + "\n\n" +
     res.mensaje;
 
   document.getElementById("resultado").innerText = texto;
